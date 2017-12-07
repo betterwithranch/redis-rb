@@ -52,7 +52,7 @@ class Redis
     #
     # @return [Object] depends on the subcommand
     def cluster(command, *args, &block)
-      response = try_cmd(find_node, :cluster, command, *args, &block)
+      response = try_cmd(find_node, :cluster, command, args, &block)
       case command.to_s.downcase
       when 'slots' then cluster_slots(response)
       when 'nodes' then cluster_nodes(response)
@@ -92,7 +92,7 @@ class Redis
       key = extract_key(method_name, *args)
       slot = key.empty? ? nil : KeySlotConverter.convert(key)
       node = find_node(slot)
-      return try_cmd(node, method_name, *args, &block) if node.respond_to?(method_name)
+      return try_cmd(node, method_name, args, &block) if node.respond_to?(method_name)
 
       super
     end
@@ -122,7 +122,7 @@ class Redis
     # @param ttl [Integer] the limit of count for retry or redirection
     #
     # @return [Object] depends on the command
-    def try_cmd(node, command, *args, ttl: RETRY_COUNT, &block)
+    def try_cmd(node, command, args, ttl: RETRY_COUNT, &block)
       ttl -= 1
       node.send(command, *args, &block)
     rescue TimeoutError, CannotConnectError, Errno::ECONNREFUSED, Errno::EACCES => err
@@ -266,7 +266,7 @@ class Redis
     #
     # @return [Hash{String => Range}] slot ranges per key of node address
     def fetch_slot_info(node, ttl: RETRY_COUNT)
-      try_cmd(node, :cluster, :slots, ttl: ttl).map do |slot_info|
+      try_cmd(node, :cluster, [:slots], ttl: ttl).map do |slot_info|
         first_slot, last_slot = slot_info[0..1]
         ip, port = slot_info[2]
         ["#{ip}:#{port}", (first_slot..last_slot)]
